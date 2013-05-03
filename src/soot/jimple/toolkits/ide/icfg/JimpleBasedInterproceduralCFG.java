@@ -1,3 +1,21 @@
+/* Soot - a J*va Optimization Framework
+ * Copyright (C) 1997-2013 Eric Bodden and others
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
 package soot.jimple.toolkits.ide.icfg;
 
 import heros.DontSynchronize;
@@ -6,7 +24,6 @@ import heros.SynchronizedBy;
 import heros.ThreadSafe;
 import heros.solver.IDESolver;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -26,7 +43,6 @@ import soot.jimple.toolkits.callgraph.CallGraph;
 import soot.jimple.toolkits.callgraph.Edge;
 import soot.jimple.toolkits.callgraph.EdgePredicate;
 import soot.jimple.toolkits.callgraph.Filter;
-import soot.jimple.toolkits.callgraph.ReachableMethods;
 import soot.toolkits.exceptions.UnitThrowAnalysis;
 import soot.toolkits.graph.DirectedGraph;
 import soot.toolkits.graph.ExceptionalUnitGraph;
@@ -47,11 +63,11 @@ import com.google.common.cache.LoadingCache;
 public class JimpleBasedInterproceduralCFG implements InterproceduralCFG<Unit,SootMethod> {
 	
 	//retains only callers that are explicit call sites or Thread.start()
-	protected static class EdgeFilter extends Filter {		
+	public static class EdgeFilter extends Filter {		
 		protected EdgeFilter() {
 			super(new EdgePredicate() {
 				public boolean want(Edge e) {				
-					return e.kind().isExplicit() || e.kind().isThread();
+					return e.kind().isExplicit() || e.kind().isThread() || e.kind().isClinit();
 				}
 			});
 		}
@@ -80,12 +96,11 @@ public class JimpleBasedInterproceduralCFG implements InterproceduralCFG<Unit,So
 					Iterator<Edge> edgeIter = new EdgeFilter().wrap(cg.edgesOutOf(u));					
 					while(edgeIter.hasNext()) {
 						Edge edge = edgeIter.next();
-						if(edge.getTgt()==null) {
-							System.err.println();
-						}
 						SootMethod m = edge.getTgt().method();
 						if(m.hasActiveBody())
-						res.add(m);
+							res.add(m);
+						else if(IDESolver.DEBUG) 
+							System.err.println("Method "+m.getSignature()+" is referenced but has no body!");
 					}
 					return res; 
 				}
@@ -111,11 +126,9 @@ public class JimpleBasedInterproceduralCFG implements InterproceduralCFG<Unit,So
 			IDESolver.DEFAULT_CACHE_BUILDER.build( new CacheLoader<SootMethod,Set<Unit>>() {
 				public Set<Unit> load(SootMethod m) throws Exception {
 					Set<Unit> res = new LinkedHashSet<Unit>();
-					//only retain calls that are explicit call sites or Thread.start()
-					Iterator<Edge> edgeIter = new EdgeFilter().wrap(cg.edgesOutOf(m));
-					while(edgeIter.hasNext()) {
-						Edge edge = edgeIter.next();
-						res.add(edge.srcUnit());			
+					for(Unit u: m.getActiveBody().getUnits()) {
+						if(isCallStmt(u))
+							res.add(u);
 					}
 					return res;
 				}
@@ -123,14 +136,12 @@ public class JimpleBasedInterproceduralCFG implements InterproceduralCFG<Unit,So
 
 	
 	public JimpleBasedInterproceduralCFG() {
-		cg = Scene.v().getCallGraph();
-		
-		List<MethodOrMethodContext> eps = new ArrayList<MethodOrMethodContext>();
-		eps.addAll(Scene.v().getEntryPoints());
-		ReachableMethods reachableMethods = new ReachableMethods(cg, eps.iterator(), new EdgeFilter());
-		reachableMethods.update();
-		
-		for(Iterator<MethodOrMethodContext> iter = reachableMethods.listener(); iter.hasNext(); ) {
+		cg = Scene.v().getCallGraph();		
+		initializeUnitToOwner();
+	}
+
+	protected void initializeUnitToOwner() {
+		for(Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener(); iter.hasNext(); ) {
 			SootMethod m = iter.next().method();
 			if(m.hasActiveBody()) {
 				Body b = m.getActiveBody();
@@ -154,7 +165,7 @@ public class JimpleBasedInterproceduralCFG implements InterproceduralCFG<Unit,So
 		return unitGraph.getSuccsOf(u);
 	}
 
-	private DirectedGraph<Unit> getOrCreateUnitGraph(Body body) {
+	protected DirectedGraph<Unit> getOrCreateUnitGraph(Body body) {
 		return bodyToUnitGraph.getUnchecked(body);
 	}
 

@@ -32,7 +32,7 @@
            		<pathelement location="${xmlprinter.jar}"/>
            		<pathelement location="${jasmin.jar}"/>
            		<pathelement location="${heros.jar}"/>
-           		<pathelement location="${axmlprinter2.jar}"/>
+           		<pathelement location="${baksmali.jar}"/>
         	</classpath>
             <src path="src"/>
             <src path="generated/singletons"/>
@@ -294,7 +294,9 @@
             <zipfileset src="${jasmin.jar}"/>
             <zipfileset src="${heros.jar}"/>
             <zipfileset src="${polyglot.jar}"/>
-            <zipfileset src="${java_cup.jar}"/>
+            <zipfileset src="${javacup.jar}"/>
+            <zipfileset src="${xmlprinter.jar}"/>      
+            <zipfileset src="${baksmali.jar}"/>      
         </jar>
 		<delete dir="META-INF"/>
     </target>
