@@ -22,7 +22,7 @@ baksmali.jar=libs/baksmali-1.3.2.jar
 ## Location of Jasmin classes jar file
 jasmin.jar=../jasmin/lib/jasminclasses-2.5.0.jar
 
-heros.jar=../heros/heros-trunk.jar
+heros.jar=libs/heros-trunk.jar
 
 ## Location of Java CUP jar file
 javacup.jar=../jasmin/libs/java_cup.jar
